@@ -1,0 +1,128 @@
+################################################################################
+#  cloudformation/bad-stack.yaml  —  INTENTIONALLY INSECURE CLOUDFORMATION
+#  DO NOT DEPLOY.  Test fixture for Checkov (cloudformation) / OX scanning.
+#  Trips: CKV_AWS_* against CFN resources.
+####################################################################
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Intentionally vulnerable stack for scanner benchmarking. DO NOT DEPLOY.
+
+Resources:
+
+  # S3 — public, unencrypted, unversioned, no logging  (CKV_AWS_18/19/20/21/53...)
+  PublicBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: insecure-cfn-bucket-fixture
+      AccessControl: PublicReadWrite
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  PublicBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PublicBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: "*"                 # world access
+            Action: "s3:*"
+            Resource: !Sub "arn:aws:s3:::${PublicBucket}/*"
+
+  # IAM — full admin "*:*"  (CKV_AWS_1/62/63)
+  AdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: admin-star
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "*"
+                Resource: "*"
+
+  # Security Group — 0.0.0.0/0 on SSH/RDP/all  (CKV_AWS_24/25/260)
+  WideOpenSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: intentionally open
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  # RDS — unencrypted, public, no backups, hardcoded creds  (CKV_AWS_16/17/...)
+  BadDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: insecure-cfn-db
+      Engine: mysql
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: "20"
+      MasterUsername: admin
+      MasterUserPassword: Password123!     # hardcoded secret
+      StorageEncrypted: false
+      PubliclyAccessible: true
+      BackupRetentionPeriod: 0
+      DeletionProtection: false
+      MultiAZ: false
+
+  # EBS volume — unencrypted  (CKV_AWS_3)
+  BadVolume:
+    Type: AWS::EC2::Volume
+    Properties:
+      AvailabilityZone: us-east-1a
+      Size: 8
+      Encrypted: false
+
+  # SNS / SQS — unencrypted  (CKV_AWS_26/27)
+  BadTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: insecure-topic
+
+  BadQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: insecure-queue
+
+  # CloudTrail — single region, no validation, no KMS  (CKV_AWS_35/36/67)
+  BadTrail:
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      S3BucketName: !Ref PublicBucket
+      IsLogging: true
+      IsMultiRegionTrail: false
+      EnableLogFileValidation: false
+
+  # KMS — rotation off  (CKV_AWS_7)
+  BadKey:
+    Type: AWS::KMS::Key
+    Properties:
+      EnableKeyRotation: false
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { AWS: "*" }
+            Action: "kms:*"
+            Resource: "*"

@@ -1,0 +1,33 @@
+################################################################################
+#  cicd/github-actions.yml  —  INTENTIONALLY INSECURE CI WORKFLOW
+#  Test fixture for Checkov (github_actions) / OX scanning.
+#  Trips: CKV_GHA_* (unpinned actions, pull_request_target + checkout, broad
+#  permissions, script injection, ...). Place under .github/workflows/ to scan.
+####################################################################
+name: insecure-ci
+on:
+  pull_request_target:        # dangerous trigger  (CKV_GHA_*)
+    branches: [main]
+
+permissions: write-all        # overly broad permissions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Unpinned action (not pinned to a commit SHA)  (CKV_GHA_*)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # Script injection via untrusted input  (CKV_GHA_*)
+      - name: greet
+        run: echo "PR title is ${{ github.event.pull_request.title }}"
+
+      # Hardcoded secret in workflow
+      - name: deploy
+        env:
+          AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+          AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+        run: |
+          curl -fsSL https://example.com/deploy.sh | sh
