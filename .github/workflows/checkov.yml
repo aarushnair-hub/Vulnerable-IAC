@@ -1,0 +1,28 @@
+name: Checkov Security Scan
+
+# Triggers the workflow on Push or Pull Request to the main branch
+on:
+  pull_request:
+    branches: [ "main", "master" ]
+  push:
+    branches: [ "main", "master" ]
+
+jobs:
+  checkov-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Check out the repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Run Checkov directly
+      # (It will automatically find and scan the plan.json files you pushed)
+      - name: Run Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: '.'
+          
+          # Optional: Uncomment the line below if you want the pipeline to pass even if Checkov finds violations
+          # soft_fail: true
