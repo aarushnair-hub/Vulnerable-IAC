@@ -6,14 +6,14 @@ on:
   push:
     branches: [ "main", "master" ]
 
+# Explicitly sets default permissions to read-only for security best practices
+permissions: read-all
+
 jobs:
   checkov-scan:
     runs-on: ubuntu-latest
     
-    # ---------------------------------------------------------
-    # THIS IS THE FIX: We explicitly grant the runner permission 
-    # to write the SARIF results into your Security tab.
-    # ---------------------------------------------------------
+    # Grants the runner specific permission to upload the results to your Security tab
     permissions:
       contents: read
       security-events: write
@@ -28,13 +28,16 @@ jobs:
         uses: bridgecrewio/checkov-action@master
         with:
           directory: '.'
+          
+          # This is the magic line! It outputs a SARIF file that GitHub uses to group by file
           output_format: cli,sarif
           output_file_path: console,results.sarif
+          
+          # Optional: Allows the pipeline to pass even if vulnerabilities are found
           soft_fail: true 
           
       - name: Upload SARIF file
-        # Upgraded to v4 to remove the deprecation warning
         uses: github/codeql-action/upload-sarif@v4
-        if: success() || failure() 
+        if: success() || failure() # Ensures the upload happens even if Checkov finds issues
         with:
           sarif_file: results.sarif
