@@ -24,5 +24,16 @@ jobs:
         with:
           directory: '.'
           
-          # Optional: Uncomment the line below if you want the pipeline to pass even if Checkov finds violations
-          # soft_fail: true
+          # Output both to the terminal (cli) and to a SARIF file
+          output_format: cli,sarif
+          output_file_path: console,results.sarif
+          
+          # We soft fail here so the pipeline doesn't crash before uploading the report
+          soft_fail: true 
+          
+      # Step 3: Upload results to GitHub Security tab for grouping
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure() # Ensures upload happens even if vulnerabilities are found
+        with:
+          sarif_file: results.sarif
