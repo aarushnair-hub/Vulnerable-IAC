@@ -1,0 +1,3 @@
+name: vuln-pulumi-fixture
+runtime: python
+description: Intentionally insecure Pulumi program for scanner benchmarking. DO NOT DEPLOY.
